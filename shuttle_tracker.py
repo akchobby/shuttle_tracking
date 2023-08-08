@@ -21,26 +21,36 @@ class ShuttleTracker:
         self.time = [0.0]
         self.timer = 0.0
 
+        self.ref_point=None
+        self.tracker_init=False
+
         # circular buffer of 5
         self.speeds = collections.deque(maxlen=5)
         self.filtered_speeds = [0.0]
         self.filtered_timestamps = []
+        self.unfiltered_speeds = [0.0]
         self.distances = [0.0]
 
         self.create_logger()
-        self.RES = 0.043/100 # m per pixel
-        self.FPS = 60
+        self.min_res = 0.000507
+        self.RES = self.min_res # m per pixel
+        
+        self.res_step= 0.020 /100
+        self.x_step= 1070
+        self.x_res_min= 500
+
+        self.FPS = 240
         self.mean = None
 
     
     def process_frame(self):
         # -- filter applied to avoid bg noise
         # ---- adding rectangle
-        p=[(1920,0),(1440,1080)]
-        self.blackout_zones(p)
+        # p=[(1920,0),(1440,1080)]
+        # self.blackout_zones(p)
 
-        p=[(1920,700),(0,0)]
-        self.blackout_zones(p)
+        # p=[(1920,700),(0,0)]
+        # self.blackout_zones(p)
 
         # p=[(1920,1080),(1570,820)]
         # self.blackout_zones(p)
@@ -99,8 +109,9 @@ class ShuttleTracker:
 
         if self.mean is not None:
             #  -- compute instantaneous speed
-            dist = self.x_dist(mean, self.mean)
+            dist = self.euclidean_dist(mean, self.mean)
             delta = self.timer - self.time[-1] if len(self.time) > 0 else 1/self.FPS
+            # self.resolution_intepolator(mean)
             speed = self.speed_calc(dist,delta) * self.RES 
 
             # filter speed based on median
@@ -109,7 +120,8 @@ class ShuttleTracker:
                 # storing speeds 
                 self.filtered_speeds.append(sorted_speeds[-1])
                 self.filtered_timestamps.append(self.timer)
-
+            
+            self.unfiltered_speeds.append(speed)
             self.speeds.append(speed)
             self.distances.append(dist)
             self.time.append(self.timer)
@@ -126,6 +138,10 @@ class ShuttleTracker:
         dis = np.sqrt((a[0]-b[0])**2 )
         return dis
     
+    def euclidean_dist(self,a,b):
+        dis = np.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2  )
+        return dis
+    
     def blackout_zones(self,p,polygon=False):
 
         if not polygon:
@@ -136,6 +152,33 @@ class ShuttleTracker:
     def speed_calc(self,dist,delta):
         return dist/(delta)
     
+    def shuttle_selection(self,first_frame):
+        while first_frame:
+            cv2.imshow("Frame", self.frame)
+            k = cv2.waitKey(25) & 0xFF 
+            if k==ord('m'):
+                self.mode = not self.mode
+            elif k == ord('s'):
+                # skipping frame
+                return first_frame
+            elif k == ord('e'):
+                self.ref_point = cv2.selectROI("Spot the Shuttle", self.frame)
+                self.logger.info(f"{self.ref_point}")
+                first_frame = False
+                cv2.destroyWindow('Spot the Shuttle')
+                cv2.destroyWindow('Frame')
+                return first_frame
+                
+            elif k == ord('q'):
+                first_frame = False
+                return first_frame
+        
+    def resolution_intepolator(self,position):
+        self.RES = self.min_res + ((self.res_step)/self.x_step)*(position[0] - self.x_res_min)
+
+
+    
+    
     def run(self):
 
         # Reading in the video 
@@ -143,24 +186,55 @@ class ShuttleTracker:
         cap = cv2.VideoCapture(file)
         if (cap.isOpened()== False): 
             self.logger.error("Error opening video stream or file")
+        first_frame = True
+        cv2.namedWindow('Frame')
+        tracker = cv2.TrackerGOTURN_create()
         
+
         while(cap.isOpened()) :
             # Capture frame-by-frame
             ret, org = cap.read()
+            
             if ret == True:
                 # Processing frame 
                 self.frame = org
-                thresh = self.process_frame()
                 self.timer += 1/self.FPS
                 
-                thresh = cv2.resize(thresh, (1280,720),interpolation=cv2.INTER_CUBIC)
-                org = cv2.resize(org, (640,360),interpolation=cv2.INTER_CUBIC)
-                cv2.imshow('Frame',org)
-                cv2.imshow('processed', thresh)
-        
+                self.frame = cv2.resize(self.frame, (640,360),interpolation=cv2.INTER_CUBIC)
+                first_frame = self.shuttle_selection(first_frame)
+
+                # Initialize tracker with first frame and bounding box 
+                if self.ref_point is not None and not self.tracker_init:
+                    self.logger.info("Tracker initialization")
+                    ok = tracker.init(self.frame,self.ref_point)
+                    self.tracker_init = True
+
+
+                if self.tracker_init : 
+                    # Update tracker
+                    ok, self.ref_point = tracker.update(self.frame)
+                    # Draw bounding box
+                    if ok:
+                        # Tracking success
+                        p1 = (int(self.ref_point[0]), int(self.ref_point[1]))
+                        p2 = (int(self.ref_point[0] + self.ref_point[2]), int(self.ref_point[1] + self.ref_point[3]))
+                        cv2.rectangle(self.frame, p1, p2, (255,0,0), 2, 1)
+                        mean = [int(self.ref_point[0] + self.ref_point[2]/2), int(self.ref_point[1] + self.ref_point[3]/2)]
+                        self.calc_speed(mean)
+                        self.mean = mean
+                        cv2.circle(self.frame,(mean[0],mean[1]), 3, (255,0,255),-1)
+                    else :
+                        # Tracking failure
+                        cv2.putText(self.frame, "Tracking failure detected", (100,80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
+                # cv2.imshow('processed', thresh)
+                cv2.imshow("Frame", self.frame)
+                
+
                 # Press Q on keyboard to  exit
-                if cv2.waitKey(25) & 0xFF == ord('q'):
+                k = cv2.waitKey(25) & 0xFF 
+                if k == ord('q'):
                     break
+
             else:
                 break
     
@@ -189,12 +263,55 @@ class ShuttleTracker:
         self.logger.addHandler(fh)
     
     def plot_stats(self):
+        self.logger.info(f"{len(self.time)}")
         self.filtered_speeds.pop(0)
-        plt.plot(self.filtered_timestamps,self.filtered_speeds)
+        plt.plot(self.time,self.unfiltered_speeds)
         plt.show()
 
         plt.plot(self.time,self.distances)
         plt.show()
+    
+    def draw_rectangle(self,event,x,y,flags,param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.drawing = True
+            self.ix, self.iy = x, y
+            self.logger.info(f"left click captured {x}, {y}")
+        elif event == cv2.EVENT_MOUSEMOVE:
+            if self.drawing == True:
+                if self.mode == True:
+                    cv2.rectangle(self.frame,(self.ix,self.iy),(x,y),(0,255,0),3)
+                    self.logger.info("drawing rect")
+                    a=x
+                    b=y
+                    if a != x | b != y:
+                        cv2.rectangle(self.frame,(self.ix,self.iy),(x,y),(0,0,0),-1)
+                        self.logger.info("drawing rect white")
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.drawing = False
+            if self.mode == True:
+                cv2.rectangle(self.frame, (self.ix, self.iy), (x, y), (0, 255, 0), 1)
+                self.logger.info("final rect")
+
+
+    def shape_selection(self,event, x, y, flags, param):
+
+    
+        # if the left mouse button was clicked, record the starting
+        # (x, y) coordinates and indicate that cropping is being performed
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.ref_point = [(x, y)]
+    
+        # check to see if the left mouse button was released
+        elif event == cv2.EVENT_LBUTTONUP:
+            # record the ending (x, y) coordinates and indicate that
+            # the cropping operation is finished
+            self.ref_point.append((x, y))
+    
+            # draw a rectangle around the region of interest
+            cv2.rectangle(self.frame, self.ref_point[0], self.ref_point[1], (0, 255, 0), 2)
+            self.logger.info(f"Selected drawn area for object tracking. {self.ref_point}")
+            
+
 
 
 if __name__ == "__main__":

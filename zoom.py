@@ -30,7 +30,7 @@ def rotate_rectangle(center, angle, l,w):
 #   print(np.argmax(points,axis=0))
   return np.array(points)
 
-cap = cv2.VideoCapture('test_case_2.mp4')
+cap = cv2.VideoCapture('test_slo_mo_3.mp4')
 
 if (cap.isOpened()== False): 
   print("Error opening video stream or file")
@@ -40,9 +40,9 @@ while(cap.isOpened()):
   ret, original = cap.read()
   if ret == True:
     cnt += 1
-    if cnt > 370:
+    if cnt > 20:
         # original = cv2.resize(original, (640,360),interpolation=cv2.INTER_CUBIC)
-        points = rotate_rectangle((1000,800),np.deg2rad(-3), 100,100)
+        points = rotate_rectangle((1770,820),np.deg2rad(0), 100,100)
         frame = cv2.fillConvexPoly(original,points,(255,0,0))
         plt.imshow(original)
         plt.show()

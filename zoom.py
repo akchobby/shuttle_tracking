@@ -1,4 +1,5 @@
 import cv2
+import sys
 import numpy as np
 import matplotlib .pyplot as plt
 
@@ -13,24 +14,15 @@ def rotate_rectangle(center, angle, l,w):
   v3 =  np.array([[-l/2,w/2]]).T
   v4 =  np.array([[-l/2,-w/2]]).T
   
-#   v1 =np.matmul(Rz(angle), v1).astype(int).T[0] 
-#   v2 =np.matmul(Rz(angle), v2).astype(int).T[0] 
-#   v3 =np.matmul(Rz(angle), v3).astype(int).T[0] 
-#   v4 =np.matmul(Rz(angle), v4).astype(int).T[0] 
-#   points = np.array([v1,v2,v3,v4])
-#   print(points)
   v1 =np.matmul(Rz(angle), v1).astype(int).T[0] + np.array([x1,y1])
   v2 =np.matmul(Rz(angle), v2).astype(int).T[0] + np.array([x1,y1])
   v3 =np.matmul(Rz(angle), v3).astype(int).T[0] + np.array([x1,y1])
   v4 =np.matmul(Rz(angle), v4).astype(int).T[0] + np.array([x1,y1])
   points = np.array([v1,v2,v3,v4])
- 
-  p3 = points[np.argmin(points,axis=0)[0]]
-  p4 = points[np.argmax(points,axis=0)[1]]
-#   print(np.argmax(points,axis=0))
   return np.array(points)
 
-cap = cv2.VideoCapture('test_slo_mo_3.mp4')
+file = sys.argv[1] if len(sys.argv) > 1  else 'test_case_2.mp4'
+cap = cv2.VideoCapture(file)
 
 if (cap.isOpened()== False): 
   print("Error opening video stream or file")
@@ -41,8 +33,8 @@ while(cap.isOpened()):
   if ret == True:
     cnt += 1
     if cnt > 20:
-        # original = cv2.resize(original, (640,360),interpolation=cv2.INTER_CUBIC)
-        points = rotate_rectangle((1770,820),np.deg2rad(0), 100,100)
+        original = cv2.resize(original, (640,360),interpolation=cv2.INTER_CUBIC)
+        points = rotate_rectangle((500,225),np.deg2rad(-3), 100,100)
         frame = cv2.fillConvexPoly(original,points,(255,0,0))
         plt.imshow(original)
         plt.show()

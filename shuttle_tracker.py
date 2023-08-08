@@ -32,14 +32,14 @@ class ShuttleTracker:
         self.distances = [0.0]
 
         self.create_logger()
-        self.min_res = 0.000507
+        self.min_res = 0.165/100 # note in zoom.py dont forget to resize the image to the smaller version
         self.RES = self.min_res # m per pixel
         
         self.res_step= 0.020 /100
         self.x_step= 1070
         self.x_res_min= 500
 
-        self.FPS = 240
+        self.FPS = 60 # 240 if slow mo
         self.mean = None
 
     

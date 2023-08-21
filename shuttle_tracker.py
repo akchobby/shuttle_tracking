@@ -200,7 +200,7 @@ class ShuttleTracker:
                 self.frame = org
                 self.timer += 1/self.FPS
                 
-                self.frame = cv2.resize(self.frame, (640,360),interpolation=cv2.INTER_CUBIC)
+                self.frame = cv2.resize(self.frame, (int(640),int(360)),interpolation=cv2.INTER_CUBIC)
                 first_frame = self.shuttle_selection(first_frame)
 
                 # Initialize tracker with first frame and bounding box 
@@ -223,6 +223,8 @@ class ShuttleTracker:
                         self.calc_speed(mean)
                         self.mean = mean
                         cv2.circle(self.frame,(mean[0],mean[1]), 3, (255,0,255),-1)
+                        cv2.putText(self.frame,  f"speed: {round(self.unfiltered_speeds[-1],2)} m/s", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,0),2)
+                        cv2.putText(self.frame,  f"max: {round(max(self.unfiltered_speeds),2)} m/s", (10,58), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
                     else :
                         # Tracking failure
                         cv2.putText(self.frame, "Tracking failure detected", (100,80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
@@ -317,6 +319,6 @@ class ShuttleTracker:
 if __name__ == "__main__":
     tracker = ShuttleTracker()
     tracker.run()
-    tracker.plot_stats()
+    # tracker.plot_stats()
 
     

@@ -4,15 +4,34 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+def resize_ar_const(imag, height=None, width=None):
+    (h, w) = imag.shape[:2]
+    # check to see if the width is None
+    if width is None:
+        # calculate the ratio of the height and construct the
+        # dimensions
+        r = height / float(h)
+        dim = (int(w * r), int(height))
+
+    # otherwise, the height is None
+    else:
+        # calculate the ratio of the width and construct the
+        # dimensions
+        r = width / float(w)
+        dim = (int(width), int(h * r))
+    return dim
+
 class ManualTracker:
 
     def __init__(self) -> None:
 
         self.time = [0.0]
         self.timer = 0.0
-        self.min_res = 0.165/100 # note in zoom.py dont forget to resize the image to the smaller version
+        self.min_res = 0.240/45 # note in zoom.py dont forget to resize the image to the smaller version
         self.RES = self.min_res # m per pixel
-        self.FPS = 240 # 240 if slow mo
+        self.SHUTTLE_LENGTH = 0.08 # measured to be 8 cm, docs say its 8.5 cm to 9.5 cm
+        self.FPS = 60 # 240 if slow mo
         self.ref_point_first = None
         self.ref_point_last = None
         self.create_logger()
@@ -26,6 +45,24 @@ class ManualTracker:
                 self.mode = not self.mode
             elif k == ord('s'):
                 # skipping frame
+                return first_frame, last_frame
+            elif k== ord('z'):
+                shuttle_bounds = cv2.selectROI("Spot the Shuttle: calib", self.frame)
+                self.logger.info(f"shuttle_bounds: {shuttle_bounds}")
+                # simple logic to set resolution
+                # the shuttle length(L) is know if the shuttle is placed in
+                # the diagonal of ROI, then sides are 
+                # a = L* (sin (atan(roi_a/roi_b))) , b = L *cos (atan(roi_a/roi_b))
+                # therefore resolution = a / roi_pixel_a 
+                # might not be perfect but enough to get an estimate
+                angle = np.arctan2(shuttle_bounds[3],shuttle_bounds[2])
+                res_x = (self.SHUTTLE_LENGTH * np.cos(angle)) / shuttle_bounds[2]
+                res_y = (self.SHUTTLE_LENGTH * np.sin(angle)) / shuttle_bounds[3]
+                self.RES = (res_x +res_y) /2
+                self.logger.info(f"angle: {np.rad2deg(angle)}")
+                self.logger.info(f"bounds, width: {shuttle_bounds[2]}, height:{shuttle_bounds[3]}")
+                self.logger.info(f"resolution: {res_x},{res_y}, avg: {self.RES}")
+                cv2.destroyWindow('Spot the Shuttle: calib')
                 return first_frame, last_frame
             
             elif k == ord('e') and first_frame:
@@ -104,7 +141,8 @@ class ManualTracker:
                 # Processing frame 
                 self.frame = org
                 self.timer += 1/self.FPS
-                self.frame = cv2.resize(self.frame, (int(640),int(360)),interpolation=cv2.INTER_CUBIC)
+                size =  resize_ar_const(self.frame, 0.7*self.frame.shape[0] )
+                self.frame = cv2.resize(self.frame, size,interpolation=cv2.INTER_CUBIC)
                 first_frame, last_frame = self.shuttle_selection(first_frame, last_frame)
                 if not(first_frame or last_frame):
                     speed = self.compute_speed()* 18/5

@@ -3,24 +3,8 @@ import sys
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
+from utils import hypot, resize_ar_const, select_height
 
-
-def resize_ar_const(imag, height=None, width=None):
-    (h, w) = imag.shape[:2]
-    # check to see if the width is None
-    if width is None:
-        # calculate the ratio of the height and construct the
-        # dimensions
-        r = height / float(h)
-        dim = (int(w * r), int(height))
-
-    # otherwise, the height is None
-    else:
-        # calculate the ratio of the width and construct the
-        # dimensions
-        r = width / float(w)
-        dim = (int(width), int(h * r))
-    return dim
 
 class ManualTracker:
 
@@ -35,6 +19,10 @@ class ManualTracker:
         self.ref_point_first = None
         self.ref_point_last = None
         self.create_logger()
+        self.initialPoint = None
+        self.preview = None
+    
+
 
     def shuttle_selection(self,first_frame, last_frame):
         while first_frame or last_frame:
@@ -80,6 +68,14 @@ class ManualTracker:
                 self.time.append(self.timer)
                 cv2.destroyWindow('Spot the Shuttle: last')
                 return first_frame, last_frame
+            elif k == ord('l'):
+                # even more simple solution to calib , 
+                # simply by drawing a line along the shuttle !
+                p1,p2 = select_height("Spot the Shuttle: line draw", self.frame)
+                self.logger.info(f"points: {p1},{p2}")
+                self.RES = self.SHUTTLE_LENGTH / hypot(p1,p2)
+                self.logger.info(f"resolution:{self.RES}")
+                cv2.destroyWindow('Spot the Shuttle: line draw')
               
             elif k == ord('q'):
                 first_frame = False
@@ -90,7 +86,7 @@ class ManualTracker:
     def euclidean_dist(self):
         a = [int(self.ref_point_first[0] + self.ref_point_first[2]/2), int(self.ref_point_first[1] + self.ref_point_first[3]/2)]
         b = [int(self.ref_point_last[0] + self.ref_point_last[2]/2), int(self.ref_point_last[1] + self.ref_point_last[3]/2)]
-        dis = np.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2  )
+        dis = hypot(a,b)
         return dis
     
     def compute_speed(self):
@@ -147,7 +143,7 @@ class ManualTracker:
                 if not(first_frame or last_frame):
                     speed = self.compute_speed()* 18/5
                     self.logger.info(f"{speed} km/h")
-                    cv2.putText(self.frame,  f"Avg speed: {round(speed,2)} km/h", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,0),2)
+                    cv2.putText(self.frame,  f"Avg speed: {round(speed,2)} km/h ({round((speed* 5/18),2)} m/s)", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,0),2)
                     cv2.imshow("Frame", self.frame)
                     k = cv2.waitKey() & 0xFF 
                     if k == ord('q'):

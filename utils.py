@@ -26,7 +26,6 @@ def select_height(name, img):
             # this will be a point at this point in time
             cv2.line(preview, initialPoint, (x,y), (0,255,0), 1)
             zoomed = crop_img(preview,x,y)
-            print(zoomed.shape)
             cv2.imshow('Zoomed', zoomed)
             is_drawing = True
  

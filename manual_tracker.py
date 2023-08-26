@@ -12,7 +12,7 @@ class ManualTracker:
 
         self.time = [0.0]
         self.timer = 0.0
-        self.min_res = 0.240/45 # note in zoom.py dont forget to resize the image to the smaller version
+        self.min_res = 0.0004796838965287947 # note in zoom.py dont forget to resize the image to the smaller version
         self.RES = self.min_res # m per pixel
         self.SHUTTLE_LENGTH = 0.08 # measured to be 8 cm, docs say its 8.5 cm to 9.5 cm
         self.FPS = 60 # 240 if slow mo

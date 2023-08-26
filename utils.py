@@ -2,10 +2,10 @@ import cv2
 import numpy as np
 
 def crop_img(image,x,y):
-    ind_x_1 = max(0,min(image.shape[0], x-100))
-    ind_y_1 = max(0,min(image.shape[1], y-100))
-    ind_x_2 = max(0,min(image.shape[0], x+100))
-    ind_y_2 = max(0,min(image.shape[1], y+100))
+    ind_x_1 = max(0,min(image.shape[1], x-100))
+    ind_y_1 = max(0,min(image.shape[0], y-100))
+    ind_x_2 = max(0,min(image.shape[1], x+100))
+    ind_y_2 = max(0,min(image.shape[0], y+100))
     # print(f"x1: {ind_x_1},x2: {ind_x_2},y1: {ind_y_1},y2: {ind_y_2}")
     cropped = image[ind_y_1:ind_y_2, ind_x_1:ind_x_2]
     return cropped
@@ -26,6 +26,7 @@ def select_height(name, img):
             # this will be a point at this point in time
             cv2.line(preview, initialPoint, (x,y), (0,255,0), 1)
             zoomed = crop_img(preview,x,y)
+            print(zoomed.shape)
             cv2.imshow('Zoomed', zoomed)
             is_drawing = True
  
